@@ -1,0 +1,4 @@
+google-cloud-asset>=3.20.0
+google-cloud-compute>=1.15.0
+google-cloud-container>=2.35.0
+functions-framework>=3.5.0
