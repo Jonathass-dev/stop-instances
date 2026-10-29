@@ -34,66 +34,44 @@ A lightweight, serverless FinOps automation on Google Cloud Platform (GCP) to st
 
 * `main.py`: Core Python routine using Google Cloud Client Libraries (`asset_v1`, `compute_v1`, `container_v1`) with Functions Framework.
 * `requirements.txt`: Python package dependencies.
-* `setup_iam.sh`: Infrastructure setup script for creating the Service Account and granting folder-level IAM bindings.
-* `deploy.sh`: Deployment script for deploying the Gen 2 Cloud Function to GCP.
+* `main.tf`: Terraform definition for all GCP resources (Cloud Function v2, Cloud Scheduler, Service Account, Storage bucket, IAM folder bindings).
+* `variables.tf`: Input variables for the Terraform configuration.
+* `outputs.tf`: Outputs exposing the Cloud Function URI, Service Account, and Scheduler job name.
+* `terraform.tfvars.example`: Example variable values for deployment.
 
 ---
 
-## Environment Variables
+## Terraform Deployment (Production / Recommended)
 
-| Variable | Description | Default |
-| :--- | :--- | :--- |
-| `FOLDER_ID` | Numerical ID of the target GCP folder (e.g., `123456789012`) | *Required* |
-| `DRY_RUN` | When `true`, simulates actions and logs them without modifying resources | `false` |
+### 1. Prerequisites
+* [Terraform](https://developer.hashicorp.com/terraform/downloads) >= 1.5.0 installed.
+* Authenticated Google Cloud SDK (`gcloud auth application-default login`).
 
----
-
-## Deployment & Setup
-
-### 1. Prerequisites & IAM Setup
-Configure environment variables and run the IAM setup script:
+### 2. Configure Variables
+Copy the example variables file:
 ```bash
-export HOST_PROJECT_ID="<YOUR_PROJECT_ID>"
-export TARGET_FOLDER_ID="<YOUR_TARGET_FOLDER_ID>"
-
-./setup_iam.sh
+cp terraform.tfvars.example terraform.tfvars
+```
+Edit `terraform.tfvars` with your target `project_id` and `folder_id`:
+```hcl
+project_id = "your-gcp-project-id"
+folder_id  = "123456789012"
+region     = "us-central1"
+dry_run    = false
 ```
 
-### 2. Deploy Cloud Function
+### 3. Deploy Infrastructure
 ```bash
-export PROJECT_ID="<YOUR_PROJECT_ID>"
-export FOLDER_ID="<YOUR_TARGET_FOLDER_ID>"
-
-./deploy.sh
-```
-
-### 3. Create Cloud Scheduler Job
-```bash
-CF_URL=$(gcloud functions describe cf-weekend-finops-shutdown --region=us-central1 --format="value(serviceConfig.uri)" --project="<YOUR_PROJECT_ID>")
-SA_EMAIL="sa-weekend-finops@<YOUR_PROJECT_ID>.iam.gserviceaccount.com"
-
-# Grant invoker permission
-gcloud functions add-invoker-policy-binding cf-weekend-finops-shutdown \
-    --region="us-central1" \
-    --member="serviceAccount:${SA_EMAIL}" \
-    --project="<YOUR_PROJECT_ID>"
-
-# Create weekly schedule (Every Friday at 22:00)
-gcloud scheduler jobs create http job-weekend-stop-instances \
-    --location="us-central1" \
-    --schedule="0 22 * * 5" \
-    --time-zone="America/Sao_Paulo" \
-    --uri="${CF_URL}" \
-    --http-method="POST" \
-    --oidc-service-account-email="${SA_EMAIL}" \
-    --project="<YOUR_PROJECT_ID>"
+terraform init
+terraform plan
+terraform apply
 ```
 
 ---
 
-## Monday Morning Recovery (Starting Resources)
+## Manual Recovery (Starting Resources on Monday)
 
-* **GCE VMs:** Developers start their instances via GCP Console (**Compute Engine > VM Instances > Start**) or via CLI:
+* **GCE VMs:** Start instances via GCP Console (**Compute Engine > VM Instances > Start**) or via CLI:
   ```bash
   gcloud compute instances start <VM_NAME> --zone=<ZONE> --project=<PROJECT_ID>
   ```

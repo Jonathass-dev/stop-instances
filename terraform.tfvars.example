@@ -1,0 +1,17 @@
+# Project where the Cloud Function and Scheduler will be deployed
+project_id = "your-gcp-project-id"
+
+# Numerical ID of the target folder to monitor and stop instances (e.g. team-labs)
+folder_id = "123456789012"
+
+# Region for the infrastructure
+region = "us-central1"
+
+# Weekly cron schedule (Default: Every Friday at 22:00)
+schedule_cron = "0 22 * * 5"
+
+# Time zone for the schedule
+time_zone = "America/Sao_Paulo"
+
+# Set to true for simulation mode (DRY-RUN) or false for live execution
+dry_run = true

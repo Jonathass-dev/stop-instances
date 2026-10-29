@@ -1,10 +1,6 @@
 import os
-import logging
 from google.cloud import asset_v1, compute_v1, container_v1
 import functions_framework
-
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
-logger = logging.getLogger(__name__)
 
 FOLDER_ID = os.environ.get("FOLDER_ID")
 DRY_RUN = os.environ.get("DRY_RUN", "false").lower() in ("true", "1", "yes")
@@ -16,7 +12,8 @@ def execute_finops_shutdown():
         raise ValueError("Environment variable 'FOLDER_ID' is required but not set.")
 
     parent_scope = f"folders/{FOLDER_ID}"
-    logger.info(f"Starting Weekend FinOps shutdown | Scope: {parent_scope} | DRY_RUN: {DRY_RUN}")
+    tag = "DRY-RUN" if DRY_RUN else "EXECUTING"
+    print(f"[{tag}] Starting Weekend FinOps shutdown for scope: {parent_scope}", flush=True)
 
     asset_client = asset_v1.AssetServiceClient()
     instances_client = compute_v1.InstancesClient()
@@ -44,15 +41,15 @@ def execute_finops_shutdown():
             try:
                 instance = instances_client.get(project=project_id, zone=zone, instance=instance_name)
                 if instance.status == "RUNNING":
-                    action = "DRY-RUN Simulation" if DRY_RUN else "EXECUTING"
-                    logger.info(f"[{action}] Stopping VM '{instance_name}' in project '{project_id}' (Zone: {zone})")
+                    tag = "DRY-RUN" if DRY_RUN else "EXECUTING"
+                    print(f"[{tag}] Stopping VM '{instance_name}' in project '{project_id}' (Zone: {zone})", flush=True)
                     if not DRY_RUN:
                         instances_client.stop(project=project_id, zone=zone, instance=instance_name)
                     gce_stopped += 1
                 else:
-                    logger.info(f"[GCE] VM '{instance_name}' in project '{project_id}' is already {instance.status}")
+                    print(f"[SKIP] VM '{instance_name}' in project '{project_id}' is {instance.status}", flush=True)
             except Exception as e:
-                logger.error(f"[GCE] Error processing VM '{instance_name}' ({project_id}): {e}")
+                print(f"[ERROR] VM '{instance_name}' in project '{project_id}': {e}", flush=True)
 
         # 2. Process GKE Clusters
         elif asset_type == "container.googleapis.com/Cluster":
@@ -61,8 +58,8 @@ def execute_finops_shutdown():
             try:
                 cluster = cluster_client.get_cluster(name=cluster_path)
                 for pool in cluster.node_pools:
-                    action = "DRY-RUN Simulation" if DRY_RUN else "EXECUTING"
-                    logger.info(f"[{action}] Scaling node pool '{pool.name}' of cluster '{cluster_name}' in project '{project_id}' to 0 nodes")
+                    tag = "DRY-RUN" if DRY_RUN else "EXECUTING"
+                    print(f"[{tag}] Scaling GKE pool '{pool.name}' of cluster '{cluster_name}' in project '{project_id}' to 0", flush=True)
                     if not DRY_RUN:
                         cluster_client.set_node_pool_size(
                             request=container_v1.SetNodePoolSizeRequest(
@@ -72,9 +69,9 @@ def execute_finops_shutdown():
                         )
                     gke_scaled += 1
             except Exception as e:
-                logger.warning(f"[GKE] Cluster '{cluster_name}' in project '{project_id}': {e}")
+                print(f"[SKIP] GKE cluster '{cluster_name}' in project '{project_id}': {e}", flush=True)
 
-    logger.info(f"Weekend FinOps completed | GCE stopped: {gce_stopped} | GKE pools scaled to 0: {gke_scaled}")
+    print(f"=== Weekend FinOps Summary === | GCE stopped: {gce_stopped} | GKE node pools scaled: {gke_scaled}", flush=True)
     return {"status": "success", "gce_stopped": gce_stopped, "gke_pools_scaled": gke_scaled}
 
 

@@ -2,3 +2,10 @@
 __pycache__/
 *.pyc
 .env
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+function-source.zip
