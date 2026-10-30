@@ -12,8 +12,6 @@ def execute_finops_shutdown():
         raise ValueError("Environment variable 'FOLDER_ID' is required but not set.")
 
     parent_scope = f"folders/{FOLDER_ID}"
-    tag = "DRY-RUN" if DRY_RUN else "EXECUTING"
-    print(f"[{tag}] Starting Weekend FinOps shutdown for scope: {parent_scope}", flush=True)
 
     asset_client = asset_v1.AssetServiceClient()
     instances_client = compute_v1.InstancesClient()
@@ -41,15 +39,14 @@ def execute_finops_shutdown():
             try:
                 instance = instances_client.get(project=project_id, zone=zone, instance=instance_name)
                 if instance.status == "RUNNING":
-                    tag = "DRY-RUN" if DRY_RUN else "EXECUTING"
-                    print(f"[{tag}] Stopping VM '{instance_name}' in project '{project_id}' (Zone: {zone})", flush=True)
+                    print(f"GCE: project={project_id} zone={zone} vm={instance_name} action=STOP", flush=True)
                     if not DRY_RUN:
                         instances_client.stop(project=project_id, zone=zone, instance=instance_name)
                     gce_stopped += 1
                 else:
-                    print(f"[SKIP] VM '{instance_name}' in project '{project_id}' is {instance.status}", flush=True)
+                    print(f"GCE: project={project_id} zone={zone} vm={instance_name} status={instance.status} action=SKIP", flush=True)
             except Exception as e:
-                print(f"[ERROR] VM '{instance_name}' in project '{project_id}': {e}", flush=True)
+                print(f"GCE: project={project_id} zone={zone} vm={instance_name} status=ERROR error={e}", flush=True)
 
         # 2. Process GKE Clusters
         elif asset_type == "container.googleapis.com/Cluster":
@@ -58,8 +55,7 @@ def execute_finops_shutdown():
             try:
                 cluster = cluster_client.get_cluster(name=cluster_path)
                 for pool in cluster.node_pools:
-                    tag = "DRY-RUN" if DRY_RUN else "EXECUTING"
-                    print(f"[{tag}] Scaling GKE pool '{pool.name}' of cluster '{cluster_name}' in project '{project_id}' to 0", flush=True)
+                    print(f"GKE: project={project_id} location={location} cluster={cluster_name} pool={pool.name} current_nodes={pool.initial_node_count} target_nodes=0 action=SCALE_DOWN", flush=True)
                     if not DRY_RUN:
                         cluster_client.set_node_pool_size(
                             request=container_v1.SetNodePoolSizeRequest(
@@ -69,9 +65,9 @@ def execute_finops_shutdown():
                         )
                     gke_scaled += 1
             except Exception as e:
-                print(f"[SKIP] GKE cluster '{cluster_name}' in project '{project_id}': {e}", flush=True)
+                print(f"GKE: project={project_id} location={location} cluster={cluster_name} status=SKIP reason={e}", flush=True)
 
-    print(f"=== Weekend FinOps Summary === | GCE stopped: {gce_stopped} | GKE node pools scaled: {gke_scaled}", flush=True)
+    print(f"FinOps: summary gce_stopped={gce_stopped} gke_pools_scaled={gke_scaled}", flush=True)
     return {"status": "success", "gce_stopped": gce_stopped, "gke_pools_scaled": gke_scaled}
 
 
