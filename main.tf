@@ -51,11 +51,11 @@ data "archive_file" "source_zip" {
   type        = "zip"
   output_path = "${path.module}/function-source.zip"
   source {
-    content  = file("${path.module}/main.py")
+    content  = file("${path.module}/src/main.py")
     filename = "main.py"
   }
   source {
-    content  = file("${path.module}/requirements.txt")
+    content  = file("${path.module}/src/requirements.txt")
     filename = "requirements.txt"
   }
 }
