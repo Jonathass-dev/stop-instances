@@ -38,12 +38,27 @@ resource "google_folder_iam_member" "permissions" {
   for_each = toset([
     "roles/cloudasset.viewer",
     "roles/compute.instanceAdmin.v1",
-    "roles/container.admin",
-    "roles/resourcemanager.folderViewer"
+    "roles/container.clusterAdmin"
   ])
   folder = "folders/${var.folder_id}"
   role   = each.key
   member = "serviceAccount:${google_service_account.sa.email}"
+
+  condition {
+    title       = "friday_finops_execution_window"
+    description = "Allows access only on Fridays between 21:55 and 22:30 America/Sao_Paulo"
+    expression  = "request.time.getDayOfWeek(\"America/Sao_Paulo\") == 5 && ((request.time.getHours(\"America/Sao_Paulo\") == 21 && request.time.getMinutes(\"America/Sao_Paulo\") >= 55) || (request.time.getHours(\"America/Sao_Paulo\") == 22 && request.time.getMinutes(\"America/Sao_Paulo\") <= 30))"
+  }
+}
+
+data "google_project" "project" {
+  project_id = var.project_id
+}
+
+resource "google_service_account_iam_member" "scheduler_token_creator" {
+  service_account_id = google_service_account.sa.name
+  role               = "roles/iam.serviceAccountTokenCreator"
+  member             = "serviceAccount:service-${data.google_project.project.number}@gcp-sa-cloudscheduler.iam.gserviceaccount.com"
 }
 
 # 3. Source Code Packaging and Storage
