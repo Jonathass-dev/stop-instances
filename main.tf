@@ -11,7 +11,7 @@ provider "google" {
   region  = var.region
 }
 
-# 1. Habilitar APIs necessárias
+# 1. Enable Required GCP APIs
 resource "google_project_service" "apis" {
   for_each = toset([
     "cloudasset.googleapis.com",
@@ -27,7 +27,7 @@ resource "google_project_service" "apis" {
   disable_on_destroy = false
 }
 
-# 2. Service Account e Permissões na Pasta
+# 2. Service Account and Folder IAM Bindings
 resource "google_service_account" "sa" {
   account_id   = "sa-weekend-finops"
   display_name = "Service Account Weekend FinOps Automation"
@@ -46,7 +46,7 @@ resource "google_folder_iam_member" "permissions" {
   member = "serviceAccount:${google_service_account.sa.email}"
 }
 
-# 3. Pacote do Código (Zip e Storage)
+# 3. Source Code Packaging and Storage
 data "archive_file" "source_zip" {
   type        = "zip"
   output_path = "${path.module}/function-source.zip"
@@ -101,7 +101,7 @@ resource "google_cloudfunctions2_function" "function" {
   }
 }
 
-# 5. Permissão de Invocação e Cloud Scheduler
+# 5. Invocation Permission and Cloud Scheduler Job
 resource "google_cloud_run_service_iam_member" "invoker" {
   project  = var.project_id
   location = var.region
